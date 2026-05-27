@@ -17,6 +17,7 @@ final class AppFactory
         AppContext::boot();
 
         $app = SlimAppFactory::create();
+        $app->getRouteCollector()->setDefaultInvocationStrategy(new RequestRouteArgsInvocationStrategy());
         $app->addRoutingMiddleware();
         $app->addBodyParsingMiddleware();
         $app->add(new JsonBodyParserMiddleware());
