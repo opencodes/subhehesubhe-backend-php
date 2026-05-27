@@ -39,9 +39,9 @@ final class CampaignController
         return JsonResponse::ok(['campaign' => $this->serialize($body)], 201);
     }
 
-    public function update(ServerRequestInterface $request, array $args): ResponseInterface
+    public function update(ServerRequestInterface $request): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id = (string) $request->getAttribute('id');
         $body = (array) ($request->getParsedBody() ?? []);
         unset($body['campaignId'], $body['id']);
 
