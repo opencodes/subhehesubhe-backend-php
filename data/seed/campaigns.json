@@ -1,0 +1,57 @@
+[
+  {
+    "id": "camp-1",
+    "title": "Diwali Special 2026 Sweet Extravaganza",
+    "code": "DIWALISWEET",
+    "discount": "Buy 500g sweets, Get 100g Laddoo Box FREE",
+    "status": "Active",
+    "performance": 82,
+    "type": "Festival",
+    "startDate": "2026-05-15",
+    "endDate": "2026-05-31"
+  },
+  {
+    "id": "camp-2",
+    "title": "Weekend Saffron Feast Biryani Rush",
+    "code": "SAFFRONFEAST",
+    "discount": "30% Off up to ₹150 + free delivery",
+    "status": "Active",
+    "performance": 64,
+    "type": "Coupon",
+    "startDate": "2026-05-01",
+    "endDate": "2026-05-30"
+  },
+  {
+    "id": "camp-3",
+    "title": "Warm Welcome New User Campaign",
+    "code": "UTSAVWELCOME",
+    "discount": "60% Off up to ₹200 for 1st order",
+    "status": "Scheduled",
+    "performance": 0,
+    "type": "Coupon",
+    "startDate": "2026-06-01",
+    "endDate": "2026-06-15"
+  },
+  {
+    "id": "camp-4",
+    "title": "Utsav Food Carnival App Download Banner",
+    "code": "CARNIVALBANNER",
+    "discount": "Interactive Carousel Main Banner",
+    "status": "Active",
+    "performance": 45,
+    "type": "Banner",
+    "startDate": "2026-05-10",
+    "endDate": "2026-05-28"
+  },
+  {
+    "id": "camp-5",
+    "title": "Festive Friend Referral Bonanza",
+    "code": "REFUTSAV",
+    "discount": "₹150 cashback in wallet for both users",
+    "status": "Active",
+    "performance": 28,
+    "type": "Referral",
+    "startDate": "2026-05-01",
+    "endDate": "2026-05-31"
+  }
+]
