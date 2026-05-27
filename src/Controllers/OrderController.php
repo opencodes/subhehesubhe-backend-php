@@ -36,9 +36,9 @@ final class OrderController
         return JsonResponse::ok(['orders' => $items]);
     }
 
-    public function get(ServerRequestInterface $request, array $args): ResponseInterface
+    public function get(ServerRequestInterface $request): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id = (string) $request->getAttribute('id');
         $doc = AppContext::boot()->mongo->collection('orders')->findOne(['orderId' => $id]);
         if ($doc === null) {
             throw new ApiException('Order not found', 404);
@@ -89,9 +89,9 @@ final class OrderController
         return JsonResponse::ok(['order' => BsonSerializer::normalize($order)], 201);
     }
 
-    public function updateStatus(ServerRequestInterface $request, array $args): ResponseInterface
+    public function updateStatus(ServerRequestInterface $request): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id = (string) $request->getAttribute('id');
         $body = (array) ($request->getParsedBody() ?? []);
         $status = (string) ($body['status'] ?? '');
         $allowed = ['Pending', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'];
