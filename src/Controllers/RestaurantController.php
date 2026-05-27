@@ -42,9 +42,9 @@ final class RestaurantController
         return JsonResponse::ok(['restaurants' => $items]);
     }
 
-    public function get(ServerRequestInterface $request, array $args): ResponseInterface
+    public function get(ServerRequestInterface $request): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id = (string) $request->getAttribute('id');
         $doc = AppContext::boot()->mongo->collection('restaurants')->findOne(['listingId' => $id]);
         if ($doc === null) {
             throw new ApiException('Restaurant not found', 404);
@@ -65,9 +65,9 @@ final class RestaurantController
         return JsonResponse::ok(['restaurant' => $this->serializeRestaurant($body)], 201);
     }
 
-    public function update(ServerRequestInterface $request, array $args): ResponseInterface
+    public function update(ServerRequestInterface $request): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id = (string) $request->getAttribute('id');
         $body = (array) ($request->getParsedBody() ?? []);
         unset($body['listingId'], $body['id']);
 
@@ -83,9 +83,9 @@ final class RestaurantController
         return JsonResponse::ok(['restaurant' => $this->serializeRestaurant((array) $doc)]);
     }
 
-    public function delete(ServerRequestInterface $request, array $args): ResponseInterface
+    public function delete(ServerRequestInterface $request): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id = (string) $request->getAttribute('id');
         $result = AppContext::boot()->mongo->collection('restaurants')->deleteOne(['listingId' => $id]);
         if ($result->getDeletedCount() === 0) {
             throw new ApiException('Restaurant not found', 404);
