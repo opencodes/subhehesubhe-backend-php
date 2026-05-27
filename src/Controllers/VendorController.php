@@ -47,9 +47,9 @@ final class VendorController
         return JsonResponse::ok(['vendors' => $items]);
     }
 
-    public function get(ServerRequestInterface $request, array $args): ResponseInterface
+    public function get(ServerRequestInterface $request): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id = (string) $request->getAttribute('id');
         $doc = AppContext::boot()->mongo->collection('vendors')->findOne(['listingId' => $id]);
         if ($doc === null) {
             throw new ApiException('Vendor not found', 404);
@@ -81,9 +81,9 @@ final class VendorController
         return JsonResponse::ok(['vendor' => $this->serializeVendor($doc)], 201);
     }
 
-    public function listEnquiries(ServerRequestInterface $request, array $args): ResponseInterface
+    public function listEnquiries(ServerRequestInterface $request): ResponseInterface
     {
-        $vendorId = (string) ($args['id'] ?? '');
+        $vendorId = (string) $request->getAttribute('id');
         $auth = (array) $request->getAttribute('auth');
         if (($auth['vendorId'] ?? null) !== null && $auth['vendorId'] !== $vendorId && ($auth['role'] ?? '') !== 'admin') {
             throw new ApiException('Forbidden', 403);
@@ -101,9 +101,9 @@ final class VendorController
         return JsonResponse::ok(['enquiries' => $items]);
     }
 
-    public function createEnquiry(ServerRequestInterface $request, array $args): ResponseInterface
+    public function createEnquiry(ServerRequestInterface $request): ResponseInterface
     {
-        $vendorId = (string) ($args['id'] ?? '');
+        $vendorId = (string) $request->getAttribute('id');
         $body = (array) ($request->getParsedBody() ?? []);
 
         $doc = [
