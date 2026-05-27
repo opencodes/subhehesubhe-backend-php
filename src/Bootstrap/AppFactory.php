@@ -17,10 +17,9 @@ final class AppFactory
         AppContext::boot();
 
         $app = SlimAppFactory::create();
+        $app->addRoutingMiddleware();
         $app->addBodyParsingMiddleware();
         $app->add(new JsonBodyParserMiddleware());
-        $app->add(new CorsMiddleware());
-        $app->addRoutingMiddleware();
 
         $displayErrors = filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $errorMiddleware = $app->addErrorMiddleware($displayErrors, true, true);
@@ -50,10 +49,15 @@ final class AppFactory
             $response = $app->getResponseFactory()->createResponse($status);
             $response->getBody()->write((string) json_encode($payload));
 
-            return $response->withHeader('Content-Type', 'application/json');
+            $response = $response->withHeader('Content-Type', 'application/json');
+
+            return CorsMiddleware::apply($response, $request->getHeaderLine('Origin'));
         });
 
         ApiRoutes::register($app);
+
+        // Outermost middleware (added last) — must run before routing so OPTIONS preflight succeeds
+        $app->add(new CorsMiddleware());
 
         return $app;
     }
