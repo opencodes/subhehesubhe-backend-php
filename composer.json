@@ -20,6 +20,7 @@
   },
   "scripts": {
     "start": "php -S localhost:8080 -t public public/index.php",
-    "seed": "php scripts/seed.php"
+    "seed": "php scripts/seed.php",
+    "create-root": "php scripts/create-root.php"
   }
 }
