@@ -15,15 +15,17 @@ final class AuthController
     public function signInCustomer(ServerRequestInterface $request): ResponseInterface
     {
         $body = (array) ($request->getParsedBody() ?? []);
-        $phone = (string) ($body['phone'] ?? '');
-        $email = (string) ($body['email'] ?? '');
-        if ($phone === '' || $email === '') {
-            throw new ApiException('phone and email are required', 422);
+        $phone = trim((string) ($body['phone'] ?? ''));
+        $email = strtolower(trim((string) ($body['email'] ?? '')));
+        $password = (string) ($body['password'] ?? '');
+        if (($phone === '' && $email === '') || $password === '') {
+            throw new ApiException('Email or phone and password are required', 422);
         }
 
         $session = AppContext::boot()->auth->signInCustomer($phone, $email, [
             'name' => $body['name'] ?? null,
             'customerType' => $body['customerType'] ?? 'standard',
+            'password' => $password,
         ]);
 
         return JsonResponse::ok($session);
@@ -32,16 +34,18 @@ final class AuthController
     public function signInVendor(ServerRequestInterface $request): ResponseInterface
     {
         $body = (array) ($request->getParsedBody() ?? []);
-        $phone = (string) ($body['phone'] ?? '');
-        $email = (string) ($body['email'] ?? '');
-        if ($phone === '' || $email === '') {
-            throw new ApiException('phone and email are required', 422);
+        $phone = trim((string) ($body['phone'] ?? ''));
+        $email = strtolower(trim((string) ($body['email'] ?? '')));
+        $password = (string) ($body['password'] ?? '');
+        if (($phone === '' && $email === '') || $password === '') {
+            throw new ApiException('Email or phone and password are required', 422);
         }
 
         $session = AppContext::boot()->auth->signInVendor($phone, $email, [
             'vendorId' => $body['vendorId'] ?? null,
             'businessName' => $body['businessName'] ?? null,
             'contactName' => $body['contactName'] ?? null,
+            'password' => $password,
         ]);
 
         return JsonResponse::ok([
