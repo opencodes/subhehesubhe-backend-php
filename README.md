@@ -27,6 +27,7 @@ composer install
 
 # 4. Configure environment
 cp .env.example .env
+# Root login (auto-created on first start): ROOT_USERNAME=root, ROOT_PASSWORD=change-me-root-password
 # Only change MONGODB_URI if yours is not localhost:27017, e.g.:
 #   MONGODB_URI=mongodb://user:pass@127.0.0.1:27017/?authSource=admin
 
@@ -83,46 +84,95 @@ Database name is controlled by `MONGODB_DATABASE` (default `shubhesubhe`). Seedi
 
 ## API base URL
 
-All routes are under `/api/v1` unless noted.
+- **Base:** `http://localhost:8080`
+- **Version prefix:** `/api/v1`
+- **Health (no prefix):** `GET /health`
 
+### Root user (local development)
 
-| Method    | Path                                | Auth   | Description                                      |
-| --------- | ----------------------------------- | ------ | ------------------------------------------------ |
-| GET       | `/health`                           | —      | Health + MongoDB ping                            |
-| POST      | `/api/v1/auth/sign-in`              | —      | Customer sign-in (phone + email)                 |
-| POST      | `/api/v1/auth/vendor/sign-in`       | —      | Vendor sign-in                                   |
-| POST      | `/api/v1/auth/register/planner`     | —      | Event planner registration                       |
-| GET       | `/api/v1/auth/me`                   | Bearer | Current user                                     |
-| GET       | `/api/v1/restaurants`               | —      | List restaurants (`?q=`, `?cuisine=`, `?isVeg=`) |
-| GET       | `/api/v1/restaurants/{id}`          | —      | Restaurant detail + menu                         |
-| GET       | `/api/v1/vendors`                   | —      | List vendors (`?category=`, `?city=`, `?q=`)     |
-| GET       | `/api/v1/vendors/{id}`              | —      | Vendor detail                                    |
-| POST      | `/api/v1/vendors/register`          | —      | New vendor listing (pending review)              |
-| POST      | `/api/v1/vendors/{id}/enquiries`    | —      | Submit enquiry                                   |
-| GET       | `/api/v1/vendors/{id}/enquiries`    | Bearer | Vendor enquiries                                 |
-| GET       | `/api/v1/catalog/categories`        | —      | Food categories                                  |
-| GET       | `/api/v1/catalog/coupons`           | —      | Festive coupons                                  |
-| GET       | `/api/v1/catalog/vendor-categories` | —      | Wedding vendor categories                        |
-| GET       | `/api/v1/campaigns`                 | —      | Marketing campaigns                              |
-| GET       | `/api/v1/portfolio`                 | —      | Portfolio items                                  |
-| GET/PATCH | `/api/v1/users/me`                  | Bearer | Profile                                          |
-| POST      | `/api/v1/users/me/addresses`        | Bearer | Add address                                      |
-| POST      | `/api/v1/orders`                    | Bearer | Place order                                      |
-| GET/PUT   | `/api/v1/planner/workspace`         | Bearer | Event planner workspace sync                     |
-| GET       | `/api/v1/admin/stats`               | Bearer | Admin dashboard metrics                          |
-| GET       | `/api/v1/admin/customers`           | Bearer | Customer list                                    |
-| GET/PATCH | `/api/v1/admin/orders`              | Bearer | Orders admin                                     |
+On first API start, a **root** account is created in MongoDB (`platform_accounts`) from `.env` if it does not already exist.
 
+| Variable | Default (`.env.example`) | Purpose |
+|----------|--------------------------|---------|
+| `ROOT_USERNAME` | `root` | Root login username |
+| `ROOT_PASSWORD` | `change-me-root-password` | Root login password |
+
+**Change these in production.** Root can create **admin** users (username + password) via `POST /api/v1/root/admins`. Admins sign in with `POST /api/v1/auth/platform/sign-in` and use the admin workspace in the frontend (`/platform/sign-in` → `/admin`).
+
+### API reference
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| **Health** |
+| GET | `/health` | — | Health + MongoDB ping |
+| **Auth (public)** |
+| POST | `/api/v1/auth/sign-in` | — | Customer sign-in (phone + email) |
+| POST | `/api/v1/auth/vendor/sign-in` | — | Vendor sign-in (phone + email) |
+| POST | `/api/v1/auth/register/planner` | — | Event planner registration |
+| POST | `/api/v1/auth/platform/sign-in` | — | Root or admin sign-in (username + password) |
+| **Auth (Bearer)** |
+| GET | `/api/v1/auth/me` | Bearer | Current user or platform account |
+| **Catalog (public)** |
+| GET | `/api/v1/catalog/categories` | — | Food categories |
+| GET | `/api/v1/catalog/coupons` | — | Festive coupons |
+| GET | `/api/v1/catalog/vendor-categories` | — | Vendor categories (MongoDB; seeded on first read) |
+| **Restaurants (public)** |
+| GET | `/api/v1/restaurants` | — | List (`?q=`, `?cuisine=`, `?isVeg=`) |
+| GET | `/api/v1/restaurants/{id}` | — | Detail + menu |
+| **Vendors (public)** |
+| GET | `/api/v1/vendors` | — | Approved vendors only (`?category=`, `?city=`, `?q=`) |
+| GET | `/api/v1/vendors/{id}` | — | Vendor detail (approved only) |
+| POST | `/api/v1/vendors/register` | — | Register listing → `status: pending_review` |
+| POST | `/api/v1/vendors/{id}/enquiries` | — | Submit enquiry |
+| **Vendors (Bearer)** |
+| GET | `/api/v1/vendors/{id}/enquiries` | Bearer | List enquiries (vendor owner or admin/root) |
+| PATCH | `/api/v1/vendors/{id}` | Bearer | Update profile / address (vendor or admin/root) |
+| POST | `/api/v1/vendors/{id}/services` | Bearer | Add service (vendor or admin/root) |
+| **Other (public)** |
+| GET | `/api/v1/campaigns` | — | Marketing campaigns |
+| GET | `/api/v1/portfolio` | — | Portfolio items |
+| **Users (Bearer — customer JWT)** |
+| GET | `/api/v1/users/me` | Bearer | Customer profile |
+| PATCH | `/api/v1/users/me` | Bearer | Update profile |
+| POST | `/api/v1/users/me/addresses` | Bearer | Add address |
+| **Orders (Bearer)** |
+| POST | `/api/v1/orders` | Bearer | Place order |
+| **Planner (Bearer)** |
+| GET | `/api/v1/planner/workspace` | Bearer | Get workspace |
+| PUT | `/api/v1/planner/workspace` | Bearer | Save workspace |
+| **Root (`role: root` only)** |
+| GET | `/api/v1/root/admins` | Bearer root | List admin accounts |
+| POST | `/api/v1/root/admins` | Bearer root | Create admin (`username`, `password`, `name`, `email?`) |
+| PATCH | `/api/v1/root/admins/{id}` | Bearer root | Update admin (`name`, `email`, `password`, `active`) |
+| **Admin (`role: admin` or `root`)** |
+| GET | `/api/v1/admin/stats` | Bearer admin/root | Dashboard metrics (`pendingVendors`, etc.) |
+| GET | `/api/v1/admin/customers` | Bearer admin/root | Customer list |
+| GET | `/api/v1/admin/orders` | Bearer admin/root | Orders (`?status=`) |
+| GET | `/api/v1/admin/orders/{id}` | Bearer admin/root | Order detail |
+| PATCH | `/api/v1/admin/orders/{id}/status` | Bearer admin/root | Update order status |
+| POST | `/api/v1/admin/restaurants` | Bearer admin/root | Create restaurant |
+| PUT | `/api/v1/admin/restaurants/{id}` | Bearer admin/root | Update restaurant |
+| DELETE | `/api/v1/admin/restaurants/{id}` | Bearer admin/root | Delete restaurant |
+| POST | `/api/v1/admin/campaigns` | Bearer admin/root | Create campaign |
+| PATCH | `/api/v1/admin/campaigns/{id}` | Bearer admin/root | Update campaign |
+| GET | `/api/v1/admin/vendors` | Bearer admin/root | List all vendors (`?status=`, `?q=`) |
+| PATCH | `/api/v1/admin/vendors/{id}/status` | Bearer admin/root | Approve/reject (`status`: `approved` \| `rejected` \| `pending_review`) |
+| GET | `/api/v1/admin/vendor-categories` | Bearer admin/root | List vendor categories |
+| POST | `/api/v1/admin/vendor-categories` | Bearer admin/root | Create category (`id`, `name`) |
+| PUT | `/api/v1/admin/vendor-categories/{id}` | Bearer admin/root | Rename category (`name`) |
+| DELETE | `/api/v1/admin/vendor-categories/{id}` | Bearer admin/root | Delete category |
 
 ### Authentication
 
-Send JWT from sign-in responses:
+Send the JWT from any sign-in response:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-Sign-in example:
+JWT claims include `role` (`customer`, `vendor`, `admin`, `root`) and `accountType: platform` for root/admin accounts.
+
+#### Customer sign-in
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/auth/sign-in \
@@ -130,7 +180,66 @@ curl -s -X POST http://localhost:8080/api/v1/auth/sign-in \
   -d '{"phone":"9876543210","email":"you@example.com","customerType":"event-planner"}'
 ```
 
-Planner workspace sync (replaces `localStorage` keys like `utsav_planner_events`):
+#### Root sign-in (default credentials from `.env`)
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/auth/platform/sign-in \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"root","password":"change-me-root-password"}'
+```
+
+Save `token` from the response, then:
+
+```bash
+export TOKEN="<token>"
+
+# Create an admin user
+curl -s -X POST http://localhost:8080/api/v1/root/admins \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "username": "ops-admin",
+    "password": "SecurePass123",
+    "name": "Operations Admin",
+    "email": "ops@example.com"
+  }'
+```
+
+#### Admin sign-in (account created by root)
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/auth/platform/sign-in \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"ops-admin","password":"SecurePass123"}'
+```
+
+Use the admin token for `/api/v1/admin/*` routes (vendor approval, categories, orders, etc.).
+
+#### Vendor registration (public)
+
+Required fields: `businessName`, `category`, `state`, `district`, `contactName`, `email`, `phone`, `description`. Optional: `primaryLocation`, `price`, `image`.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/vendors/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "businessName": "New Venue Listing",
+    "category": "venues",
+    "state": "rajasthan",
+    "district": "jaipur",
+    "primaryLocation": "Jaipur, Rajasthan",
+    "contactName": "Listing Owner",
+    "email": "listing@example.com",
+    "phone": "9988776655",
+    "description": "Wedding venue in Jaipur.",
+    "price": "On request",
+    "image": "https://example.com/photo.jpg"
+  }'
+```
+
+`state` and `district` are slugs (e.g. `rajasthan`, `jaipur`). Listing stays hidden until an admin sets `status` to `approved` via `PATCH /api/v1/admin/vendors/{listingId}/status`.
+
+#### Planner workspace
 
 ```bash
 curl -s -X PUT http://localhost:8080/api/v1/planner/workspace \
@@ -141,13 +250,19 @@ curl -s -X PUT http://localhost:8080/api/v1/planner/workspace \
 
 ## Frontend integration
 
-Point the React app at this API (e.g. Vite env):
+Point the React app at this API (e.g. `utsav-connect-master/.env.local`):
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080/api/v1
 ```
 
-Replace `MOCK_RESTAURANTS`, `ALL_MOCK_VENDORS`, and `localStorage` planner/auth flows with `fetch` calls to the endpoints above.
+| Frontend route | Purpose |
+|----------------|---------|
+| `/platform/sign-in` | Root / admin username + password |
+| `/root` | Root console — manage admin users |
+| `/admin` | Operations workspace (vendor approval, categories, commerce admin) |
+
+Customer/vendor flows use phone + email at `/sign-in`. Platform operators do not use `ADMIN_EMAILS`; use root-created admin accounts instead.
 
 ## Project layout
 
@@ -189,7 +304,9 @@ cd ../subhehesubhe-backend-php-master && composer seed
 ## Production notes
 
 - Set `APP_DEBUG=false` and a strong `JWT_SECRET`.
+- Set a strong, unique `ROOT_PASSWORD`; rotate after first deploy.
 - Restrict `CORS_ORIGINS` to your real frontend domain(s).
 - Run behind nginx/Apache with `public/` as document root.
 - Use MongoDB TLS and application DB user with least privilege.
+- Store platform accounts only in `platform_accounts` (passwords are hashed with `password_hash()`).
 
