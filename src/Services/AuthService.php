@@ -47,15 +47,34 @@ final class AuthService
         $users = $this->mongo->collection('users');
         $normalizedPhone = $this->normalizePhone($phone);
         $normalizedEmail = strtolower(trim($email));
+        $password = (string) ($profile['password'] ?? '');
+
+        $or = [];
+        if (trim($phone) !== '') {
+            $or[] = ['phone' => $normalizedPhone];
+        }
+        if (trim($email) !== '') {
+            $or[] = ['email' => $normalizedEmail];
+        }
+        if ($or === []) {
+            throw new ApiException('Email or phone is required', 422);
+        }
 
         $user = $users->findOne([
-            '$or' => [
-                ['phone' => $normalizedPhone],
-                ['email' => $normalizedEmail],
-            ],
+            'role' => 'customer',
+            '$or' => $or,
         ]);
 
         if ($user === null) {
+            $defaultPassword = Env::string('CUSTOMER_DEFAULT_PASSWORD', '');
+            if ($defaultPassword === '') {
+                throw new ApiException('Customer default password is not configured', 500);
+            }
+            $this->assertPasswordStrength($defaultPassword);
+            if ($password === '' || $password !== $defaultPassword) {
+                throw new ApiException('Invalid username or password', 401);
+            }
+
             $doc = [
                 '_id' => new ObjectId(),
                 'role' => 'customer',
@@ -63,6 +82,7 @@ final class AuthService
                 'phone' => $normalizedPhone,
                 'email' => $normalizedEmail,
                 'name' => $profile['name'] ?? 'Guest',
+                'passwordHash' => $this->hashPassword($defaultPassword),
                 'walletBalance' => 0,
                 'royaltyPoints' => 0,
                 'addresses' => [],
@@ -74,6 +94,23 @@ final class AuthService
             $users->insertOne($doc);
             $user = $doc;
         } else {
+            $hash = (string) ($user['passwordHash'] ?? '');
+            if ($hash === '') {
+                // Migration path for previously passwordless customers: allow default password once.
+                $defaultPassword = Env::string('CUSTOMER_DEFAULT_PASSWORD', '');
+                if ($defaultPassword === '' || $password === '' || $password !== $defaultPassword) {
+                    throw new ApiException('Invalid username or password', 401);
+                }
+                $users->updateOne(
+                    ['_id' => $user['_id']],
+                    ['$set' => ['passwordHash' => $this->hashPassword($defaultPassword)]]
+                );
+            } else {
+                if ($password === '' || !password_verify($password, $hash)) {
+                    throw new ApiException('Invalid username or password', 401);
+                }
+            }
+
             $users->updateOne(
                 ['_id' => $user['_id']],
                 ['$set' => array_filter([
@@ -97,21 +134,48 @@ final class AuthService
         $vendors = $this->mongo->collection('vendors');
         $normalizedPhone = $this->normalizePhone($phone);
         $normalizedEmail = strtolower(trim($email));
+        $password = (string) ($vendorMeta['password'] ?? '');
+
+        $or = [];
+        if (trim($phone) !== '') {
+            $or[] = ['phone' => $normalizedPhone];
+        }
+        if (trim($email) !== '') {
+            $or[] = ['email' => $normalizedEmail];
+        }
+        if ($or === []) {
+            throw new ApiException('Email or phone is required', 422);
+        }
 
         $user = $users->findOne([
             'role' => 'vendor',
-            '$or' => [
-                ['phone' => $normalizedPhone],
-                ['email' => $normalizedEmail],
-            ],
+            '$or' => $or,
         ]);
 
         $vendorId = $vendorMeta['vendorId'] ?? null;
 
         if ($user === null) {
-            if ($vendorId === null) {
-                $fallback = $vendors->findOne([], ['sort' => ['rating' => -1]]);
-                $vendorId = $fallback ? (string) $fallback['listingId'] : 'vn-4';
+            if ($vendorId === null || $vendorId === '') {
+                $vendorOr = [];
+                if ($normalizedEmail !== '') {
+                    $vendorOr[] = ['contactEmail' => $normalizedEmail];
+                }
+                if ($normalizedPhone !== '') {
+                    $vendorOr[] = ['contactPhone' => $normalizedPhone];
+                }
+                if ($vendorOr !== []) {
+                    $listing = $vendors->findOne(
+                        ['$or' => $vendorOr],
+                        ['sort' => ['createdAt' => -1]]
+                    );
+                    if ($listing !== null) {
+                        $vendorId = (string) $listing['listingId'];
+                    }
+                }
+            }
+
+            if ($vendorId === null || $vendorId === '') {
+                throw new ApiException('Invalid username or password', 401);
             }
 
             $user = [
@@ -126,6 +190,13 @@ final class AuthService
                 'updatedAt' => new UTCDateTime(),
             ];
             $users->insertOne($user);
+        } else {
+            $hash = (string) ($user['passwordHash'] ?? '');
+            if ($hash !== '') {
+                if ($password === '' || !password_verify($password, $hash)) {
+                    throw new ApiException('Invalid username or password', 401);
+                }
+            }
         }
 
         return $this->sessionForUser($user);
@@ -139,17 +210,32 @@ final class AuthService
 
         $phone = $this->normalizePhone((string) ($payload['phone'] ?? ''));
         $email = strtolower(trim((string) ($payload['email'] ?? '')));
+        $password = (string) ($payload['password'] ?? '');
+        $confirmPassword = (string) ($payload['confirmPassword'] ?? $password);
 
         if ($phone === '' || $email === '') {
             throw new ApiException('Phone and email are required', 422);
         }
+        if ($password === '') {
+            throw new ApiException('Password is required', 422);
+        }
+        if ($password !== $confirmPassword) {
+            throw new ApiException('Passwords do not match', 422);
+        }
+        $this->assertPasswordStrength($password);
 
         $existing = $users->findOne([
             '$or' => [['phone' => $phone], ['email' => $email]],
         ]);
 
-        if ($existing !== null && ($existing['customerType'] ?? '') === 'event-planner') {
-            return $this->sessionForUser($existing);
+        if ($existing !== null) {
+            if (($existing['customerType'] ?? '') === 'event-planner') {
+                throw new ApiException(
+                    'An account with this email or phone already exists. Please sign in.',
+                    409
+                );
+            }
+            throw new ApiException('Email or phone is already registered', 409);
         }
 
         $userId = new ObjectId();
@@ -165,6 +251,7 @@ final class AuthService
             'city' => $payload['city'] ?? null,
             'serviceCities' => $payload['serviceCities'] ?? null,
             'bio' => $payload['bio'] ?? '',
+            'passwordHash' => $this->hashPassword($password),
             'walletBalance' => 0,
             'royaltyPoints' => 0,
             'addresses' => [],
@@ -175,13 +262,23 @@ final class AuthService
         ];
         $users->insertOne($user);
 
-        $draft = $payload['draftEvent'] ?? [];
+        $draft = is_array($payload['draftEvent'] ?? null) ? $payload['draftEvent'] : [];
         $eventId = Ids::new('evt');
+        $location = trim((string) ($draft['location'] ?? ''));
+        $eventType = (string) ($draft['eventType'] ?? $payload['primaryEventType'] ?? '');
+        $bio = trim((string) ($payload['bio'] ?? ''));
+        $descriptionParts = array_filter([
+            $location !== '' ? 'Location: ' . $location : '',
+            $eventType !== '' ? 'Type: ' . $eventType : '',
+            $bio,
+        ]);
         $event = [
             'id' => $eventId,
             'name' => (string) ($draft['eventName'] ?? $payload['primaryEventType'] ?? 'My Event'),
             'date' => (string) ($draft['date'] ?? ''),
-            'description' => (string) ($payload['bio'] ?? ''),
+            'location' => $location,
+            'eventType' => $eventType,
+            'description' => implode(' · ', $descriptionParts),
             'isActive' => true,
         ];
 
@@ -204,7 +301,14 @@ final class AuthService
             'updatedAt' => new UTCDateTime(),
         ]);
 
-        return $this->sessionForUser($user);
+        return [
+            'registered' => true,
+            'user' => $this->serializeUser($user),
+            'workspace' => [
+                'eventId' => $eventId,
+                'eventName' => $event['name'],
+            ],
+        ];
     }
 
     /** @param array<string, mixed>|object $user */
@@ -268,6 +372,23 @@ final class AuthService
         }
 
         return trim($phone);
+    }
+
+    public function hashPassword(string $password): string
+    {
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        if ($hash === false) {
+            throw new ApiException('Could not hash password', 500);
+        }
+
+        return $hash;
+    }
+
+    public function assertPasswordStrength(string $password): void
+    {
+        if (strlen($password) < 8) {
+            throw new ApiException('Password must be at least 8 characters', 422);
+        }
     }
 
 }
