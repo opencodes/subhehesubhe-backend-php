@@ -30,14 +30,15 @@ final class AppFactory
             \Psr\Http\Message\ServerRequestInterface $request,
             \Throwable $exception
         ) use ($app, $displayErrors) {
-            $status = method_exists($exception, 'getStatusCode')
-                ? (int) $exception->getStatusCode()
-                : 500;
-
-            if (!method_exists($exception, 'getStatusCode')) {
-                $status = $exception instanceof \App\Utils\ApiException
-                    ? $exception->statusCode
-                    : 500;
+            $status = 500;
+            if ($exception instanceof \Slim\Exception\HttpException) {
+                $status = (int) $exception->getCode();
+            } elseif ($exception instanceof \App\Utils\ApiException) {
+                $status = (int) $exception->statusCode;
+            } elseif (method_exists($exception, 'getStatusCode')) {
+                $status = (int) $exception->getStatusCode();
+            } elseif ($exception->getCode() >= 400 && $exception->getCode() < 600) {
+                $status = (int) $exception->getCode();
             }
 
             $payload = [

@@ -27,7 +27,7 @@ final class ApiRoutes
     {
         $app->get('/health', [HealthController::class, 'index']);
 
-        $app->group('/api/v1', function (RouteCollectorProxy $group) {
+        $app->group('/v1', function (RouteCollectorProxy $group) {
             $auth = new AuthController();
             $group->post('/auth/sign-in', [$auth, 'signInCustomer']);
             $group->post('/auth/vendor/sign-in', [$auth, 'signInVendor']);
