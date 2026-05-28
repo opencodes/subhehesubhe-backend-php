@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Config\AppContext;
+use App\Config\Env;
 use App\Utils\ApiException;
 use App\Utils\BsonSerializer;
 use App\Utils\Ids;
@@ -75,6 +76,24 @@ final class VendorController
         return JsonResponse::ok(['vendor' => $this->serializeVendor((array) $doc)]);
     }
 
+    /** Vendor dashboard: own listing regardless of approval status. */
+    public function getDashboard(ServerRequestInterface $request): ResponseInterface
+    {
+        $vendorId = (string) $request->getAttribute('id');
+        $auth = (array) $request->getAttribute('auth');
+        $role = (string) ($auth['role'] ?? '');
+        if ($role === 'vendor' && (string) ($auth['vendorId'] ?? '') !== $vendorId) {
+            throw new ApiException('Forbidden', 403);
+        }
+
+        $doc = AppContext::boot()->mongo->collection('vendors')->findOne(['listingId' => $vendorId]);
+        if ($doc === null) {
+            throw new ApiException('Vendor not found', 404);
+        }
+
+        return JsonResponse::ok(['vendor' => $this->serializeVendor((array) $doc)]);
+    }
+
     public function register(ServerRequestInterface $request): ResponseInterface
     {
         $body = (array) ($request->getParsedBody() ?? []);
@@ -90,6 +109,9 @@ final class VendorController
         if ($primaryLocation === '') {
             $primaryLocation = $district . ', ' . $state;
         }
+
+        $contactEmail = strtolower(trim((string) ($body['email'] ?? '')));
+        $contactPhone = trim((string) ($body['phone'] ?? ''));
 
         $doc = [
             'listingId' => $listingId,
@@ -110,8 +132,8 @@ final class VendorController
             'price' => (string) ($body['price'] ?? 'On request'),
             'category' => (string) ($body['category'] ?? 'venues'),
             'image' => (string) ($body['image'] ?? ''),
-            'contactEmail' => (string) ($body['email'] ?? ''),
-            'contactPhone' => (string) ($body['phone'] ?? ''),
+            'contactEmail' => $contactEmail,
+            'contactPhone' => $contactPhone,
             'services' => [],
             'status' => 'pending_review',
             'createdAt' => new UTCDateTime(),
@@ -119,7 +141,79 @@ final class VendorController
 
         AppContext::boot()->mongo->collection('vendors')->insertOne($doc);
 
+        // Create the vendor login account (users collection) with default password.
+        // NOTE: Default password must be provided via env var; do not hardcode.
+        $defaultPassword = Env::string('VENDOR_DEFAULT_PASSWORD', '');
+        if ($defaultPassword === '') {
+            throw new ApiException('Vendor default password is not configured', 500);
+        }
+        AppContext::boot()->auth->assertPasswordStrength($defaultPassword);
+
+        $users = AppContext::boot()->mongo->collection('users');
+        $existing = $users->findOne([
+            'role' => 'vendor',
+            '$or' => [
+                ['phone' => AppContext::boot()->auth->normalizePhone($contactPhone)],
+                ['email' => $contactEmail],
+            ],
+        ]);
+        if ($existing === null) {
+            $users->insertOne([
+                '_id' => new \MongoDB\BSON\ObjectId(),
+                'role' => 'vendor',
+                'vendorId' => $listingId,
+                'phone' => AppContext::boot()->auth->normalizePhone($contactPhone),
+                'email' => $contactEmail,
+                'contactName' => (string) ($body['contactName'] ?? 'Vendor Contact'),
+                'businessName' => (string) ($body['businessName'] ?? $body['name'] ?? 'My Business'),
+                'passwordHash' => AppContext::boot()->auth->hashPassword($defaultPassword),
+                'createdAt' => new UTCDateTime(),
+                'updatedAt' => new UTCDateTime(),
+            ]);
+        }
+
         return JsonResponse::ok(['vendor' => $this->serializeVendor($doc)], 201);
+    }
+
+    public function changePassword(ServerRequestInterface $request): ResponseInterface
+    {
+        $vendorId = (string) $request->getAttribute('id');
+        $auth = (array) $request->getAttribute('auth');
+        if (($auth['role'] ?? '') !== 'vendor' || (string) ($auth['vendorId'] ?? '') !== $vendorId) {
+            throw new ApiException('Forbidden', 403);
+        }
+
+        $body = (array) ($request->getParsedBody() ?? []);
+        $currentPassword = (string) ($body['currentPassword'] ?? '');
+        $newPassword = (string) ($body['newPassword'] ?? '');
+        $confirmPassword = (string) ($body['confirmPassword'] ?? $newPassword);
+
+        if ($currentPassword === '' || $newPassword === '') {
+            throw new ApiException('Current password and new password are required', 422);
+        }
+        if ($newPassword !== $confirmPassword) {
+            throw new ApiException('Passwords do not match', 422);
+        }
+        AppContext::boot()->auth->assertPasswordStrength($newPassword);
+
+        $userId = (string) $request->getAttribute('userId');
+        $users = AppContext::boot()->mongo->collection('users');
+        $user = $users->findOne(['_id' => new \MongoDB\BSON\ObjectId($userId), 'role' => 'vendor']);
+        if ($user === null) {
+            throw new ApiException('User not found', 404);
+        }
+
+        $hash = (string) ($user['passwordHash'] ?? '');
+        if ($hash === '' || !password_verify($currentPassword, $hash)) {
+            throw new ApiException('Invalid current password', 401);
+        }
+
+        $users->updateOne(
+            ['_id' => $user['_id']],
+            ['$set' => ['passwordHash' => AppContext::boot()->auth->hashPassword($newPassword), 'updatedAt' => new UTCDateTime()]]
+        );
+
+        return JsonResponse::ok(['changed' => true]);
     }
 
     public function updateProfile(ServerRequestInterface $request): ResponseInterface
