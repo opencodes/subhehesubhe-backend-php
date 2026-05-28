@@ -67,8 +67,21 @@ final class AuthController
 
     public function me(ServerRequestInterface $request): ResponseInterface
     {
+        $auth = (array) $request->getAttribute('auth');
         $userId = (string) $request->getAttribute('userId');
-        $user = AppContext::boot()->auth->getUserById($userId);
+        $ctx = AppContext::boot();
+
+        if (($auth['accountType'] ?? '') === 'platform') {
+            $platform = new \App\Services\PlatformAccountService($ctx->mongo, $ctx->auth);
+            $account = $platform->getAccountById($userId);
+            if ($account === null) {
+                throw new ApiException('Account not found', 404);
+            }
+
+            return JsonResponse::ok(['user' => $account]);
+        }
+
+        $user = $ctx->auth->getUserById($userId);
         if ($user === null) {
             throw new ApiException('User not found', 404);
         }

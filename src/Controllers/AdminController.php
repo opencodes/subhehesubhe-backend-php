@@ -18,6 +18,9 @@ final class AdminController
         $users = $mongo->collection('users');
         $restaurants = $mongo->collection('restaurants');
 
+        $vendors = $mongo->collection('vendors');
+        $pendingVendors = $vendors->countDocuments(['status' => 'pending_review']);
+
         $totalOrders = $orders->countDocuments([]);
         $pipeline = [
             ['$group' => ['_id' => null, 'total' => ['$sum' => '$totalAmount']]],
@@ -48,6 +51,7 @@ final class AdminController
                 'totalRevenue' => $totalRevenue,
                 'activeCustomers' => $users->countDocuments(['role' => 'customer']),
                 'activeRestaurants' => $restaurants->countDocuments([]),
+                'pendingVendors' => $pendingVendors,
                 'revenueTrend' => $this->revenueTrend($orders),
                 'categorySales' => $categorySales,
                 'recentOrders' => $recent,

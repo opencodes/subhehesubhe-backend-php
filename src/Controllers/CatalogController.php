@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Services\VendorCategoryService;
 use App\Utils\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -40,24 +41,8 @@ final class CatalogController
 
     public function vendorCategories(ServerRequestInterface $request): ResponseInterface
     {
-        return JsonResponse::ok([
-            'categories' => [
-                ['id' => 'venues', 'name' => 'Venues'],
-                ['id' => 'photographers', 'name' => 'Photographers'],
-                ['id' => 'makeup', 'name' => 'Makeup Artists'],
-                ['id' => 'planning-decor', 'name' => 'Planning & Decor'],
-                ['id' => 'virtual-planning', 'name' => 'Virtual Planning'],
-                ['id' => 'mehndi', 'name' => 'Mehndi'],
-                ['id' => 'music-dance', 'name' => 'Sangeet & Choreographers'],
-                ['id' => 'invites-gifts', 'name' => 'Invites & Gifts'],
-                ['id' => 'food', 'name' => 'Catering'],
-                ['id' => 'pre-wedding-shoot', 'name' => 'Pre Wedding Shoot'],
-                ['id' => 'bridal-wear', 'name' => 'Bridal Wear'],
-                ['id' => 'groom-wear', 'name' => 'Groom Wear'],
-                ['id' => 'jewellery-accessories', 'name' => 'Jewellery'],
-                ['id' => 'pandits', 'name' => 'Pandits'],
-                ['id' => 'bridal-grooming', 'name' => 'Bridal Grooming'],
-            ],
-        ]);
+        $categories = (new VendorCategoryService())->list();
+
+        return JsonResponse::ok(['categories' => $categories]);
     }
 }

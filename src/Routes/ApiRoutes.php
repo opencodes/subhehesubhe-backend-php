@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Routes;
 
 use App\Controllers\AdminController;
+use App\Controllers\AdminVendorController;
+use App\Controllers\PlatformAuthController;
 use App\Controllers\AuthController;
 use App\Controllers\CampaignController;
 use App\Controllers\CatalogController;
@@ -30,6 +32,9 @@ final class ApiRoutes
             $group->post('/auth/sign-in', [$auth, 'signInCustomer']);
             $group->post('/auth/vendor/sign-in', [$auth, 'signInVendor']);
             $group->post('/auth/register/planner', [$auth, 'registerPlanner']);
+
+            $platformAuth = new PlatformAuthController();
+            $group->post('/auth/platform/sign-in', [$platformAuth, 'signIn']);
 
             $catalog = new CatalogController();
             $group->get('/catalog/categories', [$catalog, 'categories']);
@@ -72,10 +77,21 @@ final class ApiRoutes
 
                 $vendors = new VendorController();
                 $secured->get('/vendors/{id}/enquiries', [$vendors, 'listEnquiries'])->add($authMw);
+                $secured->patch('/vendors/{id}', [$vendors, 'updateProfile'])->add($authMw);
+                $secured->post('/vendors/{id}/services', [$vendors, 'addService'])->add($authMw);
+            });
+
+            $group->group('/root', function (RouteCollectorProxy $root) {
+                $rootAuth = new AuthMiddleware(['root']);
+                $platformAuth = new PlatformAuthController();
+                $root->get('/admins', [$platformAuth, 'listAdmins'])->add($rootAuth);
+                $root->post('/admins', [$platformAuth, 'createAdmin'])->add($rootAuth);
+                $root->patch('/admins/{id}', [$platformAuth, 'updateAdmin'])->add($rootAuth);
             });
 
             $group->group('/admin', function (RouteCollectorProxy $admin) {
-                $adminAuth = new AuthMiddleware(['admin', 'customer']);
+                $adminAuth = new AuthMiddleware(['admin', 'root']);
+                $adminOnly = new AuthMiddleware(['admin', 'root']);
 
                 $adminCtrl = new AdminController();
                 $admin->get('/stats', [$adminCtrl, 'stats'])->add($adminAuth);
@@ -96,6 +112,14 @@ final class ApiRoutes
                 $campaigns = new CampaignController();
                 $admin->post('/campaigns', [$campaigns, 'create'])->add($adminAuth);
                 $admin->patch('/campaigns/{id}', [$campaigns, 'update'])->add($adminAuth);
+
+                $adminVendors = new AdminVendorController();
+                $admin->get('/vendors', [$adminVendors, 'listVendors'])->add($adminOnly);
+                $admin->patch('/vendors/{id}/status', [$adminVendors, 'updateVendorStatus'])->add($adminOnly);
+                $admin->get('/vendor-categories', [$adminVendors, 'listVendorCategories'])->add($adminOnly);
+                $admin->post('/vendor-categories', [$adminVendors, 'createVendorCategory'])->add($adminOnly);
+                $admin->put('/vendor-categories/{id}', [$adminVendors, 'updateVendorCategory'])->add($adminOnly);
+                $admin->delete('/vendor-categories/{id}', [$adminVendors, 'deleteVendorCategory'])->add($adminOnly);
             });
         });
     }

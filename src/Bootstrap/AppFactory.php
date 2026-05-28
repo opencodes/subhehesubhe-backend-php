@@ -14,7 +14,8 @@ final class AppFactory
 {
     public static function create(): \Slim\App
     {
-        AppContext::boot();
+        $ctx = AppContext::boot();
+        (new \App\Services\PlatformAccountService($ctx->mongo, $ctx->auth))->ensureRootAccount();
 
         $app = SlimAppFactory::create();
         $app->getRouteCollector()->setDefaultInvocationStrategy(new RequestRouteArgsInvocationStrategy());
