@@ -76,9 +76,11 @@ final class ApiRoutes
                 $secured->put('/planner/workspace', [$planner, 'saveWorkspace'])->add($authMw);
 
                 $vendors = new VendorController();
+                $secured->get('/vendors/{id}/dashboard', [$vendors, 'getDashboard'])->add($authMw);
                 $secured->get('/vendors/{id}/enquiries', [$vendors, 'listEnquiries'])->add($authMw);
                 $secured->patch('/vendors/{id}', [$vendors, 'updateProfile'])->add($authMw);
                 $secured->post('/vendors/{id}/services', [$vendors, 'addService'])->add($authMw);
+                $secured->post('/vendors/{id}/change-password', [$vendors, 'changePassword'])->add($authMw);
             });
 
             $group->group('/root', function (RouteCollectorProxy $root) {
