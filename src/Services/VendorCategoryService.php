@@ -13,21 +13,21 @@ final class VendorCategoryService
 {
     /** @var list<array{id: string, name: string}> */
     private const DEFAULT_CATEGORIES = [
-        ['id' => 'venues', 'name' => 'Venues'],
-        ['id' => 'photographers', 'name' => 'Photographers'],
-        ['id' => 'makeup', 'name' => 'Makeup Artists'],
-        ['id' => 'planning-decor', 'name' => 'Planning & Decor'],
-        ['id' => 'virtual-planning', 'name' => 'Virtual Planning'],
-        ['id' => 'mehndi', 'name' => 'Mehndi'],
-        ['id' => 'music-dance', 'name' => 'Sangeet & Choreographers'],
-        ['id' => 'invites-gifts', 'name' => 'Invites & Gifts'],
-        ['id' => 'food', 'name' => 'Catering'],
-        ['id' => 'pre-wedding-shoot', 'name' => 'Pre Wedding Shoot'],
-        ['id' => 'bridal-wear', 'name' => 'Bridal Wear'],
-        ['id' => 'groom-wear', 'name' => 'Groom Wear'],
-        ['id' => 'jewellery-accessories', 'name' => 'Jewellery'],
-        ['id' => 'pandits', 'name' => 'Pandits'],
-        ['id' => 'bridal-grooming', 'name' => 'Bridal Grooming'],
+        ['id' => 'tent-furniture', 'name' => 'Tent & Furniture'],
+        ['id' => 'catering-service', 'name' => 'Catering Service & Halwai'],
+        ['id' => 'transportation', 'name' => 'Car Rental & Transportation'],
+        ['id' => 'lighting', 'name' => 'Lighting'],
+        ['id' => 'sound', 'name' => 'Sound'],
+        ['id' => 'dhol-player', 'name' => 'Dhol Players'],
+        ['id' => 'dj-performer', 'name' => 'DJ & Performers'],
+        ['id' => 'decor', 'name' => 'Decoration'],
+        ['id' => 'sweets-shop', 'name' => 'Sweets Shop'],
+        ['id' => 'photographer-videographer', 'name' => 'Photographer & Videographer'],
+        ['id' => 'makeup-artist', 'name' => 'Makeup Artist'],
+        ['id' => 'milk-dairy', 'name' => 'Milk & Dairy'],
+        ['id' => 'curd', 'name' => 'Curd'],
+        ['id' => 'vegitable', 'name' => 'Vegitable'],
+        ['id' => 'fruit', 'name' => 'Fruit'],
     ];
 
     /** @return list<array{id: string, name: string}> */

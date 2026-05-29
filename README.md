@@ -310,3 +310,10 @@ cd ../subhehesubhe-backend-php-master && composer seed
 - Use MongoDB TLS and application DB user with least privilege.
 - Store platform accounts only in `platform_accounts` (passwords are hashed with `password_hash()`).
 
+## Customer Login
+- email: rkjha.it.in@gmail.com
+- password: "Customer@SubheHeSubhe"
+
+## Vendor Login
+- email: sushil@gmail.com
+- password: "Vendor@SubheHeSubhe"
