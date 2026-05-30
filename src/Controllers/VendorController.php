@@ -24,7 +24,7 @@ final class VendorController
         if (!empty($params['category'])) {
             $and[] = ['category' => (string) $params['category']];
         }
-        if (!empty($params['city'])) {
+        if (!empty($params['city']) && strtolower(trim((string) $params['city'])) !== 'all') {
             $city = (string) $params['city'];
             $cityRegex = preg_quote($city, '/');
             $and[] = [
@@ -98,81 +98,50 @@ final class VendorController
     {
         $body = (array) ($request->getParsedBody() ?? []);
 
-        $state = trim((string) ($body['state'] ?? ''));
-        $district = trim((string) ($body['district'] ?? ''));
-        if ($state === '' || $district === '') {
-            throw new ApiException('State and district are required', 422);
-        }
-
-        $listingId = Ids::new('vn');
-        $primaryLocation = trim((string) ($body['primaryLocation'] ?? $body['city'] ?? ''));
-        if ($primaryLocation === '') {
-            $primaryLocation = $district . ', ' . $state;
-        }
-
-        $contactEmail = strtolower(trim((string) ($body['email'] ?? '')));
-        $contactPhone = trim((string) ($body['phone'] ?? ''));
-
-        $doc = [
-            'listingId' => $listingId,
-            'name' => (string) ($body['businessName'] ?? $body['name'] ?? 'New Vendor'),
-            'location' => $primaryLocation,
-            'businessAddress' => '',
-            'addressLine1' => '',
-            'addressLine2' => '',
-            'landmark' => '',
-            'pinCode' => '',
-            'state' => $state,
-            'district' => $district,
-            'city' => $district,
-            'villagesServed' => [],
-            'contactName' => (string) ($body['contactName'] ?? ''),
-            'description' => (string) ($body['description'] ?? ''),
-            'rating' => 0,
-            'price' => (string) ($body['price'] ?? 'On request'),
-            'category' => (string) ($body['category'] ?? 'venues'),
-            'image' => (string) ($body['image'] ?? ''),
-            'contactEmail' => $contactEmail,
-            'contactPhone' => $contactPhone,
-            'services' => [],
-            'status' => 'pending_review',
-            'createdAt' => new UTCDateTime(),
-        ];
+        $doc = $this->buildVendorDocument($body, false);
 
         AppContext::boot()->mongo->collection('vendors')->insertOne($doc);
+        $this->createVendorAccountIfNeeded($doc);
 
-        // Create the vendor login account (users collection) with default password.
-        // NOTE: Default password must be provided via env var; do not hardcode.
+        return JsonResponse::ok(['vendor' => $this->serializeVendor($doc)], 201);
+    }
+
+    public function registerBulk(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = (array) ($request->getParsedBody() ?? []);
+        $vendors = $body['vendors'] ?? null;
+        if (!is_array($vendors) || count($vendors) === 0) {
+            throw new ApiException('vendors must be a non-empty array', 422);
+        }
+
+        $docs = [];
+        foreach ($vendors as $index => $vendor) {
+            if (!is_array($vendor)) {
+                throw new ApiException('vendors[' . $index . '] must be an object', 422);
+            }
+            try {
+                $docs[] = $this->buildVendorDocument($vendor, true);
+            } catch (ApiException $e) {
+                throw new ApiException('vendors[' . $index . ']: ' . $e->getMessage(), $e->statusCode);
+            }
+        }
+
+        // Validate password configuration before inserting anything.
         $defaultPassword = Env::string('VENDOR_DEFAULT_PASSWORD', '');
         if ($defaultPassword === '') {
             throw new ApiException('Vendor default password is not configured', 500);
         }
         AppContext::boot()->auth->assertPasswordStrength($defaultPassword);
 
-        $users = AppContext::boot()->mongo->collection('users');
-        $existing = $users->findOne([
-            'role' => 'vendor',
-            '$or' => [
-                ['phone' => AppContext::boot()->auth->normalizePhone($contactPhone)],
-                ['email' => $contactEmail],
-            ],
-        ]);
-        if ($existing === null) {
-            $users->insertOne([
-                '_id' => new \MongoDB\BSON\ObjectId(),
-                'role' => 'vendor',
-                'vendorId' => $listingId,
-                'phone' => AppContext::boot()->auth->normalizePhone($contactPhone),
-                'email' => $contactEmail,
-                'contactName' => (string) ($body['contactName'] ?? 'Vendor Contact'),
-                'businessName' => (string) ($body['businessName'] ?? $body['name'] ?? 'My Business'),
-                'passwordHash' => AppContext::boot()->auth->hashPassword($defaultPassword),
-                'createdAt' => new UTCDateTime(),
-                'updatedAt' => new UTCDateTime(),
-            ]);
+        AppContext::boot()->mongo->collection('vendors')->insertMany($docs);
+        foreach ($docs as $doc) {
+            $this->createVendorAccountIfNeeded($doc);
         }
 
-        return JsonResponse::ok(['vendor' => $this->serializeVendor($doc)], 201);
+        return JsonResponse::ok([
+            'count' => count($docs),
+            'vendors' => array_map(fn (array $doc): array => $this->serializeVendor($doc), $docs),
+        ], 201);
     }
 
     public function changePassword(ServerRequestInterface $request): ResponseInterface
@@ -403,6 +372,148 @@ final class VendorController
         }
 
         return array_values(array_unique($out));
+    }
+
+    /** @param array<string, mixed> $body */
+    private function buildVendorDocument(array $body, bool $includeServices): array
+    {
+        $state = trim((string) ($body['state'] ?? ''));
+        $district = trim((string) ($body['district'] ?? ''));
+        if ($state === '' || $district === '') {
+            throw new ApiException('State and district are required', 422);
+        }
+
+        $primaryLocation = trim((string) ($body['primaryLocation'] ?? $body['city'] ?? ''));
+        if ($primaryLocation === '') {
+            $primaryLocation = $district . ', ' . $state;
+        }
+
+        $status = 'pending_review';
+        if ($includeServices) {
+            $status = trim((string) ($body['status'] ?? 'pending_review'));
+            if (!in_array($status, ['pending_review', 'approved', 'rejected'], true)) {
+                throw new ApiException('status must be one of: pending_review, approved, rejected', 422);
+            }
+        }
+
+        $image = trim((string) ($body['image'] ?? ''));
+        if ($includeServices && $image === '') {
+            $image = Env::string(
+                'DEFAULT_VENDOR_PROFILE_IMAGE',
+                'https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=500'
+            );
+        }
+
+        return [
+            'listingId' => Ids::new('vn'),
+            'name' => (string) ($body['businessName'] ?? $body['name'] ?? 'New Vendor'),
+            'location' => $primaryLocation,
+            'businessAddress' => strtolower(trim((string) ($body['businessAddress'] ?? ''))),
+            'addressLine1' => strtolower(trim((string) ($body['addressLine1'] ?? ''))),
+            'addressLine2' => strtolower(trim((string) ($body['addressLine2'] ?? ''))),
+            'landmark' => strtolower(trim((string) ($body['landmark'] ?? ''))),
+            'pinCode' => trim((string) ($body['pinCode'] ?? '')),
+            'state' => $state,
+            'district' => $district,
+            'city' => $district,
+            'villagesServed' => $this->normalizeStringList($body['villagesServed'] ?? []),
+            'contactName' => (string) ($body['contactName'] ?? ''),
+            'description' => (string) ($body['description'] ?? ''),
+            'rating' => (float) ($body['rating'] ?? 0),
+            'price' => (string) ($body['price'] ?? 'On request'),
+            'category' => (string) ($body['category'] ?? 'venues'),
+            'image' => $image,
+            'contactEmail' => strtolower(trim((string) ($body['email'] ?? $body['contactEmail'] ?? ''))),
+            'contactPhone' => trim((string) ($body['phone'] ?? $body['contactPhone'] ?? '')),
+            'services' => $includeServices ? $this->normalizeServices($body['services'] ?? []) : [],
+            'status' => $status,
+            'createdAt' => new UTCDateTime(),
+        ];
+    }
+
+    /** @param mixed $raw */
+    private function normalizeServices($raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $services = [];
+        foreach ($raw as $index => $item) {
+            if (!is_array($item)) {
+                throw new ApiException('services[' . $index . '] must be an object', 422);
+            }
+
+            $name = trim((string) ($item['name'] ?? ''));
+            $description = trim((string) ($item['description'] ?? ''));
+            $category = trim((string) ($item['category'] ?? ''));
+            $image = trim((string) ($item['image'] ?? ''));
+            $price = (float) ($item['price'] ?? 0);
+
+            if ($name === '' || $description === '' || $category === '') {
+                throw new ApiException('services[' . $index . '] requires name, category, and description', 422);
+            }
+            if ($price <= 0) {
+                throw new ApiException('services[' . $index . '] price must be greater than zero', 422);
+            }
+            if ($image === '') {
+                $image = Env::string(
+                    'DEFAULT_VENDOR_PROFILE_IMAGE',
+                    'https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=500'
+                );
+            }
+
+            $services[] = [
+                'id' => Ids::new('svc'),
+                'name' => $name,
+                'description' => $description,
+                'category' => $category,
+                'image' => $image,
+                'price' => $price,
+                'rating' => (float) ($item['rating'] ?? 0),
+                'ratingCount' => (int) ($item['ratingCount'] ?? 0),
+                'createdAt' => new UTCDateTime(),
+            ];
+        }
+
+        return $services;
+    }
+
+    /** @param array<string, mixed> $doc */
+    private function createVendorAccountIfNeeded(array $doc): void
+    {
+        $defaultPassword = Env::string('VENDOR_DEFAULT_PASSWORD', '');
+        if ($defaultPassword === '') {
+            throw new ApiException('Vendor default password is not configured', 500);
+        }
+        AppContext::boot()->auth->assertPasswordStrength($defaultPassword);
+
+        $contactEmail = (string) ($doc['contactEmail'] ?? '');
+        $contactPhone = (string) ($doc['contactPhone'] ?? '');
+        $users = AppContext::boot()->mongo->collection('users');
+        $existing = $users->findOne([
+            'role' => 'vendor',
+            '$or' => [
+                ['phone' => AppContext::boot()->auth->normalizePhone($contactPhone)],
+                ['email' => $contactEmail],
+            ],
+        ]);
+        if ($existing !== null) {
+            return;
+        }
+
+        $users->insertOne([
+            '_id' => new \MongoDB\BSON\ObjectId(),
+            'role' => 'vendor',
+            'vendorId' => (string) $doc['listingId'],
+            'phone' => AppContext::boot()->auth->normalizePhone($contactPhone),
+            'email' => $contactEmail,
+            'contactName' => (string) ($doc['contactName'] ?? 'Vendor Contact'),
+            'businessName' => (string) ($doc['name'] ?? 'My Business'),
+            'passwordHash' => AppContext::boot()->auth->hashPassword($defaultPassword),
+            'createdAt' => new UTCDateTime(),
+            'updatedAt' => new UTCDateTime(),
+        ]);
     }
 
     /** @param array<string, mixed> $doc */

@@ -116,7 +116,9 @@ final class ApiRoutes
                 $admin->patch('/campaigns/{id}', [$campaigns, 'update'])->add($adminAuth);
 
                 $adminVendors = new AdminVendorController();
+                $vendors = new VendorController();
                 $admin->get('/vendors', [$adminVendors, 'listVendors'])->add($adminOnly);
+                $admin->post('/vendors/bulk', [$vendors, 'registerBulk'])->add($adminOnly);
                 $admin->patch('/vendors/{id}/status', [$adminVendors, 'updateVendorStatus'])->add($adminOnly);
                 $admin->get('/vendor-categories', [$adminVendors, 'listVendorCategories'])->add($adminOnly);
                 $admin->post('/vendor-categories', [$adminVendors, 'createVendorCategory'])->add($adminOnly);

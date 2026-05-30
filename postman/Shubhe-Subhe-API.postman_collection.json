@@ -11,6 +11,7 @@
     { "key": "token", "value": "" },
     { "key": "restaurantId", "value": "rest-1" },
     { "key": "vendorId", "value": "vn-4" },
+    { "key": "adminId", "value": "" },
     { "key": "orderId", "value": "" },
     { "key": "campaignId", "value": "camp-1" }
   ],
@@ -135,6 +136,34 @@
               "raw": "{\n  \"phone\": \"9876543299\",\n  \"email\": \"vendor@example.com\",\n  \"vendorId\": \"{{vendorId}}\",\n  \"businessName\": \"Royal Gardens\",\n  \"contactName\": \"Vendor Contact\"\n}"
             },
             "url": "{{apiBase}}/auth/vendor/sign-in"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.token) {",
+                  "  pm.collectionVariables.set('token', j.data.token);",
+                  "  pm.environment.set('token', j.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Platform Sign In",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"root\",\n  \"password\": \"change-me-root-password\"\n}"
+            },
+            "url": "{{apiBase}}/auth/platform/sign-in"
           },
           "event": [
             {
@@ -284,7 +313,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"businessName\": \"New Venue Listing\",\n  \"location\": \"Jaipur, Rajasthan\",\n  \"city\": \"Jaipur\",\n  \"category\": \"venues\",\n  \"price\": \"₹2L+\",\n  \"email\": \"listing@example.com\",\n  \"phone\": \"9988776655\",\n  \"image\": \"https://images.unsplash.com/photo-1519167758481-83f550bb49b8?w=500\"\n}"
+              "raw": "{\n  \"businessName\": \"New Venue Listing\",\n  \"contactName\": \"Riya Sharma\",\n  \"state\": \"Rajasthan\",\n  \"district\": \"Jaipur\",\n  \"primaryLocation\": \"Jaipur, Rajasthan\",\n  \"businessAddress\": \"Amer Road, Jaipur\",\n  \"category\": \"venues\",\n  \"price\": \"₹2L+\",\n  \"email\": \"listing@example.com\",\n  \"phone\": \"9988776655\",\n  \"image\": \"https://images.unsplash.com/photo-1519167758481-83f550bb49b8?w=500\"\n}"
             },
             "url": "{{apiBase}}/vendors/register"
           }
@@ -308,6 +337,50 @@
             "method": "GET",
             "url": "{{apiBase}}/vendors/{{vendorId}}/enquiries",
             "description": "Use **Vendor Sign In** with matching vendorId, or customer token (admin bypass N/A — vendor must match unless role admin)."
+          }
+        },
+        {
+          "name": "Get Vendor Dashboard (auth)",
+          "request": {
+            "method": "GET",
+            "url": "{{apiBase}}/vendors/{{vendorId}}/dashboard",
+            "description": "Returns the vendor listing for the signed-in vendor even while pending review."
+          }
+        },
+        {
+          "name": "Update Vendor Profile (auth)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressLine1\": \"12 Celebration Road\",\n  \"addressLine2\": \"Near Palace Gate\",\n  \"landmark\": \"City Palace\",\n  \"pinCode\": \"302001\",\n  \"state\": \"Rajasthan\",\n  \"district\": \"Jaipur\",\n  \"primaryLocation\": \"Jaipur, Rajasthan\",\n  \"villagesServed\": [\"Amer\", \"Sanganer\"]\n}"
+            },
+            "url": "{{apiBase}}/vendors/{{vendorId}}"
+          }
+        },
+        {
+          "name": "Add Vendor Service (auth)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium Wedding Stage\",\n  \"description\": \"Floral stage setup with lighting and seating.\",\n  \"category\": \"decorators\",\n  \"image\": \"https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=500\",\n  \"price\": 75000\n}"
+            },
+            "url": "{{apiBase}}/vendors/{{vendorId}}/services"
+          }
+        },
+        {
+          "name": "Change Vendor Password (auth)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"change-me-vendor-password\",\n  \"newPassword\": \"new-vendor-password-123\",\n  \"confirmPassword\": \"new-vendor-password-123\"\n}"
+            },
+            "url": "{{apiBase}}/vendors/{{vendorId}}/change-password"
           }
         }
       ]
@@ -426,8 +499,42 @@
       ]
     },
     {
+      "name": "Root",
+      "description": "Requires root token. Run **Auth → Platform Sign In** with root credentials first.",
+      "item": [
+        {
+          "name": "List Admins",
+          "request": { "method": "GET", "url": "{{apiBase}}/root/admins" }
+        },
+        {
+          "name": "Create Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin-postman\",\n  \"password\": \"admin-password-123\",\n  \"name\": \"Postman Admin\",\n  \"email\": \"admin.postman@example.com\"\n}"
+            },
+            "url": "{{apiBase}}/root/admins"
+          }
+        },
+        {
+          "name": "Update Admin",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Postman Admin\",\n  \"active\": true\n}"
+            },
+            "url": "{{apiBase}}/root/admins/{{adminId}}"
+          }
+        }
+      ]
+    },
+    {
       "name": "Admin",
-      "description": "Requires Bearer token (customer role is allowed by API middleware). Run **Customer Sign In** first.",
+      "description": "Requires admin/root Bearer token. Run **Auth → Platform Sign In** first.",
       "item": [
         {
           "name": "Dashboard Stats",
@@ -525,6 +632,81 @@
               "raw": "{\n  \"status\": \"paused\"\n}"
             },
             "url": "{{apiBase}}/admin/campaigns/{{campaignId}}"
+          }
+        },
+        {
+          "name": "List Admin Vendors",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{apiBase}}/admin/vendors?status=&category=&q=",
+              "host": ["{{apiBase}}"],
+              "path": ["admin", "vendors"],
+              "query": [
+                { "key": "status", "value": "", "description": "pending_review | approved | rejected" },
+                { "key": "category", "value": "", "description": "Vendor category id" },
+                { "key": "q", "value": "", "description": "Search name/email/phone/listing id" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bulk Register Vendors With Services",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vendors\": [\n    {\n      \"businessName\": \"Jaipur Royal Decor\",\n      \"contactName\": \"Amit Sharma\",\n      \"state\": \"Rajasthan\",\n      \"district\": \"Jaipur\",\n      \"primaryLocation\": \"Jaipur, Rajasthan\",\n      \"businessAddress\": \"MI Road, Jaipur\",\n      \"category\": \"decorators\",\n      \"price\": \"₹75K+\",\n      \"email\": \"decor.bulk@example.com\",\n      \"phone\": \"9000001001\",\n      \"services\": [\n        {\n          \"name\": \"Wedding Stage Decor\",\n          \"description\": \"Premium floral stage, lighting, and guest backdrop.\",\n          \"category\": \"decorators\",\n          \"price\": 85000\n        }\n      ]\n    },\n    {\n      \"businessName\": \"Shree Band Baaja\",\n      \"contactName\": \"Neha Verma\",\n      \"state\": \"Rajasthan\",\n      \"district\": \"Jaipur\",\n      \"primaryLocation\": \"Jaipur, Rajasthan\",\n      \"category\": \"music-dj\",\n      \"price\": \"₹35K+\",\n      \"email\": \"band.bulk@example.com\",\n      \"phone\": \"9000001002\",\n      \"services\": [\n        {\n          \"name\": \"Baraat Band Package\",\n          \"description\": \"Live band with dhol and procession sound support.\",\n          \"category\": \"music-dj\",\n          \"price\": 45000\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": "{{apiBase}}/admin/vendors/bulk"
+          }
+        },
+        {
+          "name": "Update Vendor Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            },
+            "url": "{{apiBase}}/admin/vendors/{{vendorId}}/status"
+          }
+        },
+        {
+          "name": "List Admin Vendor Categories",
+          "request": { "method": "GET", "url": "{{apiBase}}/admin/vendor-categories" }
+        },
+        {
+          "name": "Create Vendor Category",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"postman-category\",\n  \"name\": \"Postman Category\"\n}"
+            },
+            "url": "{{apiBase}}/admin/vendor-categories"
+          }
+        },
+        {
+          "name": "Update Vendor Category",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Postman Category\"\n}"
+            },
+            "url": "{{apiBase}}/admin/vendor-categories/postman-category"
+          }
+        },
+        {
+          "name": "Delete Vendor Category",
+          "request": {
+            "method": "DELETE",
+            "url": "{{apiBase}}/admin/vendor-categories/postman-category"
           }
         }
       ]

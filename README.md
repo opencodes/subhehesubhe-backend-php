@@ -126,8 +126,10 @@ On first API start, a **root** account is created in MongoDB (`platform_accounts
 | POST | `/api/v1/vendors/{id}/enquiries` | — | Submit enquiry |
 | **Vendors (Bearer)** |
 | GET | `/api/v1/vendors/{id}/enquiries` | Bearer | List enquiries (vendor owner or admin/root) |
+| GET | `/api/v1/vendors/{id}/dashboard` | Bearer | Vendor dashboard listing, including pending review |
 | PATCH | `/api/v1/vendors/{id}` | Bearer | Update profile / address (vendor or admin/root) |
 | POST | `/api/v1/vendors/{id}/services` | Bearer | Add service (vendor or admin/root) |
+| POST | `/api/v1/vendors/{id}/change-password` | Bearer | Change vendor password |
 | **Other (public)** |
 | GET | `/api/v1/campaigns` | — | Marketing campaigns |
 | GET | `/api/v1/portfolio` | — | Portfolio items |
@@ -156,6 +158,7 @@ On first API start, a **root** account is created in MongoDB (`platform_accounts
 | POST | `/api/v1/admin/campaigns` | Bearer admin/root | Create campaign |
 | PATCH | `/api/v1/admin/campaigns/{id}` | Bearer admin/root | Update campaign |
 | GET | `/api/v1/admin/vendors` | Bearer admin/root | List all vendors (`?status=`, `?q=`) |
+| POST | `/api/v1/admin/vendors/bulk` | Bearer admin/root | Bulk register vendors with nested `services` |
 | PATCH | `/api/v1/admin/vendors/{id}/status` | Bearer admin/root | Approve/reject (`status`: `approved` \| `rejected` \| `pending_review`) |
 | GET | `/api/v1/admin/vendor-categories` | Bearer admin/root | List vendor categories |
 | POST | `/api/v1/admin/vendor-categories` | Bearer admin/root | Create category (`id`, `name`) |
@@ -238,6 +241,8 @@ curl -s -X POST http://localhost:8080/api/v1/vendors/register \
 ```
 
 `state` and `district` are slugs (e.g. `rajasthan`, `jaipur`). Listing stays hidden until an admin sets `status` to `approved` via `PATCH /api/v1/admin/vendors/{listingId}/status`.
+
+For `POST /api/v1/admin/vendors/bulk`, vendor profile `image` and nested service `image` are optional. If omitted, the API uses `DEFAULT_VENDOR_PROFILE_IMAGE` from `.env` and falls back to `https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=500`.
 
 #### Planner workspace
 
