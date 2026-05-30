@@ -50,11 +50,15 @@ final class VendorCategoryService
         return $items;
     }
 
-    /** @return array{id: string, name: string} */
-    public function create(string $id, string $name): array
+    /** @return array{id: string, name: string, category_img: string} */
+    public function create(string $id, string $name, string $category_img): array
     {
         $id = $this->normalizeId($id);
         $name = trim($name);
+        $category_img = trim($category_img);
+        if ($name === '') {
+            throw new ApiException('Category name is required', 422);
+        }
         if ($name === '') {
             throw new ApiException('Category name is required', 422);
         }
@@ -68,17 +72,18 @@ final class VendorCategoryService
         $doc = [
             'id' => $id,
             'name' => $name,
+            'category_img' => $category_img,
             'sortOrder' => $sortOrder,
             'createdAt' => new UTCDateTime(),
             'updatedAt' => new UTCDateTime(),
         ];
         $collection->insertOne($doc);
-
-        return ['id' => $id, 'name' => $name];
+    
+        return ['id' => $id, 'name' => $name, 'category_img' => $category_img];
     }
 
     /** @return array{id: string, name: string} */
-    public function update(string $id, string $name): array
+    public function update(string $id, string $name , string $category_img): array
     {
         $id = $this->normalizeId($id);
         $name = trim($name);
@@ -88,14 +93,14 @@ final class VendorCategoryService
 
         $result = $this->collection()->updateOne(
             ['id' => $id],
-            ['$set' => ['name' => $name, 'updatedAt' => new UTCDateTime()]]
+            ['$set' => ['name' => $name, 'category_img' => $category_img, 'updatedAt' => new UTCDateTime()]]
         );
 
         if ($result->getMatchedCount() === 0) {
             throw new ApiException('Category not found', 404);
         }
 
-        return ['id' => $id, 'name' => $name];
+        return ['id' => $id, 'name' => $name, 'category_img' => $category_img];
     }
 
     public function delete(string $id): void

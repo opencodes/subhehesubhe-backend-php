@@ -99,12 +99,22 @@ final class AdminVendorController
         $body = (array) ($request->getParsedBody() ?? []);
         $id = (string) ($body['id'] ?? '');
         $name = (string) ($body['name'] ?? '');
+        $category_img = (string) ($body['category_img'] ?? '');
 
         if ($id === '') {
             throw new ApiException('Category id is required', 422);
         }
 
-        $category = (new VendorCategoryService())->create($id, $name);
+        if ($name === '') {
+            throw new ApiException('Category name is required', 422);
+        }
+
+        if ($category_img === '') {
+            throw new ApiException('Category image is required', 422);
+        }
+        error_log(print_r($body, true));
+    
+        $category = (new VendorCategoryService())->create($id, $name, $category_img);
 
         return JsonResponse::ok(['category' => $category], 201);
     }
@@ -114,8 +124,9 @@ final class AdminVendorController
         $id = (string) $request->getAttribute('id');
         $body = (array) ($request->getParsedBody() ?? []);
         $name = (string) ($body['name'] ?? '');
+        $category_img = (string) ($body['category_img'] ?? '');
 
-        $category = (new VendorCategoryService())->update($id, $name);
+        $category = (new VendorCategoryService())->update($id, $name, $category_img);
 
         return JsonResponse::ok(['category' => $category]);
     }
